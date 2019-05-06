@@ -34,4 +34,40 @@
     //方法2
     Person person3 = util.get(Person.class);
   }
+  
+  //通过代理的方法设置/获取sp里面的数据
+  interface PersonUtil{
+    //get模式
+    //get模式的话,返回类型表示获取的key的类型
+    //可以给一个参数,参数类型必须和返回类型一样
+    //该惭怍作为当该key是空值时的默认值
+    @SpGet
+    int getAge();
+    
+    @SpGet
+    int getAge(int age);
+    
+    //set模式
+    //set模式返回值必须该interface的类型
+    //每个参数必须有SpKey的注解,否则不会起作用
+    //参数可以为多个
+    @SpSet
+    PersonUtil setPerson(@SpKey("name") String name,@SpKey("age") int age);
+    
+    @SpSet
+    PersonUtil setAge(@SpKey("age") int age);
+  }
+  public static void main(String[] args){
+    BaseSharedPreferencesUtil util = new BasePreferencesUtil(){
+      @Override
+      protected String getSpName() {
+        return "name";
+      }
+    };
+    PersonUtil personUtil = util.getControlObject(PersonUtil.class);
+    int age1 = personUtil.getAge();
+    int age2 = personUtil.getAge(5);
+    personUtil.setPerson("mishaki",2);
+    personUtil.setAge(3);
+  }
 </pre>
