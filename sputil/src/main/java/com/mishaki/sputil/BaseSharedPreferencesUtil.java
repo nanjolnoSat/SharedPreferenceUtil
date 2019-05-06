@@ -17,7 +17,7 @@ import java.util.List;
 
 public abstract class BaseSharedPreferencesUtil {
     private String spName;
-    private Application context = ParseUtil.getApplication();
+    private static Application context = ParseUtil.getApplication();
 
     public BaseSharedPreferencesUtil() {
         spName = getSpName();
@@ -319,7 +319,7 @@ public abstract class BaseSharedPreferencesUtil {
     /**
      * 获取SharedPreference对象
      */
-    public SharedPreferences getSp() {
+    protected SharedPreferences getSp() {
         return context.getSharedPreferences(spName, Context.MODE_PRIVATE);
     }
 
