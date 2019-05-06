@@ -19,6 +19,7 @@ class ParseUtil {
     }
 
     private static void scanField(Object entity, Class clazz, List<EntityInfo> list, boolean isGet) {
+        //只要不是Object就不断向上遍历
         if (clazz == Object.class) {
             return;
         }
@@ -26,7 +27,7 @@ class ParseUtil {
         Field[] fields = clazz.getFields();
         for (Field field : fields) {
             int modify = field.getModifiers();
-            Boolean result = !Modifier.isTransient(modify) &&
+            boolean result = !Modifier.isTransient(modify) &&
                     !Modifier.isStatic(modify) &&
                     Modifier.isPublic(modify);
             if (result) {
@@ -38,8 +39,8 @@ class ParseUtil {
                         parseInfo.field = field;
                     }
                     SpValue value = field.getAnnotation(SpValue.class);
-                    if (value != null && !value.key().isEmpty()) {
-                        parseInfo.key = value.key();
+                    if (value != null && !value.value().isEmpty()) {
+                        parseInfo.key = value.value();
                     } else {
                         parseInfo.key = field.getName();
                     }

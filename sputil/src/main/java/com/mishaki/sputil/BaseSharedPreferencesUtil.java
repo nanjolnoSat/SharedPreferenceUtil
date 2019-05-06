@@ -3,7 +3,6 @@ package com.mishaki.sputil;
 import android.app.Application;
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.util.Log;
 
 import com.mishaki.sputil.annotation.SpGet;
 import com.mishaki.sputil.annotation.SpKey;
@@ -18,18 +17,19 @@ import java.util.List;
 
 public abstract class BaseSharedPreferencesUtil {
     private String spName;
-    /*private Application context = Reflect.on("android.app.ActivityThread")
-            .call("currentActivityThread")
-            .field("mInitialApplication").get();*/
     private Application context = ParseUtil.getApplication();
 
     public BaseSharedPreferencesUtil() {
         spName = getSpName();
-        Log.v("BaseSharedPreferencesUtilMsg","context:" + context);
     }
 
     protected abstract String getSpName();
 
+    /**
+     * 将对象里面所有的带有public修饰符,并且没有static和transient修饰符<br/>
+     * 的字段报错到sp里面,可以在该字段上面贴SpValue的注解来修改key值<br/>
+     * 可以在class面贴SpPrefix注解给该class里面所有的key加个前缀
+     */
     public void put(Object entity) {
         SpPrefix spPrefix = entity.getClass().getAnnotation(SpPrefix.class);
         String prefix = "";
@@ -60,30 +60,40 @@ public abstract class BaseSharedPreferencesUtil {
         editor.apply();
     }
 
+    /**
+     * 通过Class里面的字段名称获取对应的key值<br/>
+     * 并将相应的数据设置到该对象<br/>
+     * 如果该对象某个参数有值,该值将作为当key不存在时的默认值
+     */
     public void get(Object entity) {
         SharedPreferences sp = getSp();
         List<EntityInfo> list = ParseUtil.parseEntity(entity, true);
+        SpPrefix spPrefix = entity.getClass().getAnnotation(SpPrefix.class);
+        String prefix = "";
+        if(spPrefix != null) {
+            prefix = spPrefix.value();
+        }
         for (EntityInfo entityInfo : list) {
             try {
                 switch (entityInfo.type) {
                     case EntityInfo.INT:
-                        int intValue = sp.getInt(entityInfo.key, Integer.parseInt(entityInfo.value));
+                        int intValue = sp.getInt(prefix + entityInfo.key, Integer.parseInt(entityInfo.value));
                         entityInfo.field.set(entity, intValue);
                         break;
                     case EntityInfo.LONG:
-                        long longValue = sp.getLong(entityInfo.key, Long.parseLong(entityInfo.value));
+                        long longValue = sp.getLong(prefix + entityInfo.key, Long.parseLong(entityInfo.value));
                         entityInfo.field.set(entity, longValue);
                         break;
                     case EntityInfo.FLOAT:
-                        float floatValue = sp.getFloat(entityInfo.key, Float.parseFloat(entityInfo.value));
+                        float floatValue = sp.getFloat(prefix + entityInfo.key, Float.parseFloat(entityInfo.value));
                         entityInfo.field.set(entity, floatValue);
                         break;
                     case EntityInfo.BOOLEAN:
-                        boolean booleanValue = sp.getBoolean(entityInfo.key, Boolean.parseBoolean(entityInfo.value));
+                        boolean booleanValue = sp.getBoolean(prefix + entityInfo.key, Boolean.parseBoolean(entityInfo.value));
                         entityInfo.field.set(entity, booleanValue);
                         break;
                     default:
-                        String stringValue = sp.getString(entityInfo.key, entityInfo.value);
+                        String stringValue = sp.getString(prefix + entityInfo.key, entityInfo.value);
                         entityInfo.field.set(entity, stringValue);
                         break;
                 }
@@ -93,6 +103,10 @@ public abstract class BaseSharedPreferencesUtil {
         }
     }
 
+    /**
+     * 通过Class里面的字段名称获取对应的key值<br/>
+     * 并封装到一个对象,再返回,该Class必须拥有一个无参数的构造方法
+     */
     public <T> T get(Class<T> clazz) {
         T entity = null;
         try {
@@ -104,27 +118,37 @@ public abstract class BaseSharedPreferencesUtil {
         return entity;
     }
 
+    /**
+     * 使用代理的方式获取控制对象
+     */
+    @SuppressWarnings("unchecked")
     public <T> T getControlObject(Class<T> clazz) {
-        return (T) Proxy.newProxyInstance(clazz.getClassLoader(), new Class[]{clazz}, new InvocationHandler() {
+        return (T) Proxy.newProxyInstance(getClass().getClassLoader(), new Class[]{clazz}, new InvocationHandler() {
             @Override
             public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
                 SpGet spGet = method.getAnnotation(SpGet.class);
                 SpSet spPut = method.getAnnotation(SpSet.class);
+                //必须有其中的一个注解
                 if (spGet == null && spPut == null) {
                     return null;
                 }
+                //当为Get模式的时候
                 if (spGet != null) {
+                    //必须拥有key
                     String key = spGet.value();
                     if (key.isEmpty()) {
                         return null;
                     }
+                    //获取返回类型
                     String type = ParseUtil.getType(method.getReturnType());
+                    //该方法是否拥有参数
                     boolean hasDefaultValue = args != null && args.length != 0;
                     switch (type) {
                         case EntityInfo.INT:
                             int intDefault = 0;
                             if (hasDefaultValue) {
                                 if (args[0] != null) {
+                                    //当有参数的时候,拿该参数的值作为默认值
                                     intDefault = Integer.parseInt(String.valueOf(args[0]));
                                 }
                             }
@@ -154,6 +178,7 @@ public abstract class BaseSharedPreferencesUtil {
                             }
                             return getSp().getBoolean(key, booleanDefault);
                         default:
+                            //当不是上面的4种类型的时候,就视为String
                             String stringDefault = "";
                             if (hasDefaultValue) {
                                 if (args[0] != null) {
@@ -162,7 +187,7 @@ public abstract class BaseSharedPreferencesUtil {
                             }
                             return getSp().getString(key, stringDefault);
                     }
-                } else {
+                } else {//当为Set模式的时候
                     if (args == null || args.length == 0) {
                         return null;
                     }
@@ -173,9 +198,11 @@ public abstract class BaseSharedPreferencesUtil {
                         for (Annotation annotation : method.getParameterAnnotations()[i]) {
                             if (annotation.annotationType() == SpKey.class) {
                                 spMethodValue = (SpKey) annotation;
+                                break;
                             }
                         }
                         String key;
+                        //必须拥有key,否则不继续执行
                         if (spMethodValue != null) {
                             key = spMethodValue.value();
                         } else {
@@ -184,24 +211,24 @@ public abstract class BaseSharedPreferencesUtil {
                         String type = ParseUtil.getType(types[i]);
                         switch (type) {
                             case EntityInfo.INT:
-                                int intDefault = Integer.parseInt(String.valueOf(args[i]));
-                                editor.putInt(key, intDefault);
+                                int intValue = Integer.parseInt(String.valueOf(args[i]));
+                                editor.putInt(key, intValue);
                                 break;
                             case EntityInfo.LONG:
-                                long longDefault = Long.parseLong(String.valueOf(args[i]));
-                                editor.putLong(key, longDefault);
+                                long longValue = Long.parseLong(String.valueOf(args[i]));
+                                editor.putLong(key, longValue);
                                 break;
                             case EntityInfo.FLOAT:
-                                float floatDefault = Float.parseFloat(String.valueOf(args[i]));
-                                editor.putFloat(key, floatDefault);
+                                float floatValue = Float.parseFloat(String.valueOf(args[i]));
+                                editor.putFloat(key, floatValue);
                                 break;
                             case EntityInfo.BOOLEAN:
-                                boolean booleanDefault = Boolean.parseBoolean(String.valueOf(args[i]));
-                                editor.putBoolean(key, booleanDefault);
+                                boolean booleanValue = Boolean.parseBoolean(String.valueOf(args[i]));
+                                editor.putBoolean(key, booleanValue);
                                 break;
                             default:
-                                String stringDefault = String.valueOf(args[i]);
-                                editor.putString(key, stringDefault);
+                                String stringValue = String.valueOf(args[i]);
+                                editor.putString(key, stringValue);
                                 break;
                         }
                     }
@@ -289,10 +316,16 @@ public abstract class BaseSharedPreferencesUtil {
         return getSp().contains(key);
     }
 
+    /**
+     * 获取SharedPreference对象
+     */
     public SharedPreferences getSp() {
         return context.getSharedPreferences(spName, Context.MODE_PRIVATE);
     }
 
+    /**
+     * 获取Editor对象
+     */
     protected SharedPreferences.Editor getEditor() {
         return getSp().edit();
     }
