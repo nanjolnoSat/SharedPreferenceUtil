@@ -1,4 +1,5 @@
 # SharedPreferenceUtil
+<a href="https://raw.githubusercontent.com/nanjolnoSat/SharedPreferenceUtil/master/spUtil.jar">jar包</a><br/>
 这是一个SharedPreference的工具类,需继承BaseSharedPreferencesUtil,重写getSpName方法,设置name<br/>
 使用的时候用new的方法创建工具类,里面提供了一推set,get方法,这些没啥好说的<br/>
 还提供了直接给一个Object就将Object的所有属性设置到sp里面,用法<br/>
