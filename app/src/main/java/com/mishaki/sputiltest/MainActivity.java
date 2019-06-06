@@ -33,5 +33,7 @@ public class MainActivity extends AppCompatActivity {
         Person person4 = util.get(Person.class);
         Log.v("MainActivityMsg","name3:" + person4.name);
         Log.v("MainActivityMsg","sex:" + person4.sex);
+
+        Log.v("MainActivityMsg","ignoreTest:" + util.getString("person-ignoreTest"));
     }
 }

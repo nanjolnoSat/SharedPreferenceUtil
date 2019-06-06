@@ -3,6 +3,7 @@ package com.mishaki.sputil;
 
 import android.app.Application;
 
+import com.mishaki.sputil.annotation.SpIgnore;
 import com.mishaki.sputil.annotation.SpValue;
 
 import java.lang.reflect.Field;
@@ -30,7 +31,8 @@ class ParseUtil {
             boolean result = !Modifier.isTransient(modify) &&
                     !Modifier.isStatic(modify) &&
                     Modifier.isPublic(modify);
-            if (result) {
+            SpIgnore spIgnore = field.getAnnotation(SpIgnore.class);
+            if (result && spIgnore == null) {
                 try {
                     Class fieldType = field.getType();
                     EntityInfo parseInfo = new EntityInfo();
